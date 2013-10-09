@@ -207,7 +207,7 @@ sub run {
     my @pendingSockets=IO::Select->new(@sockets)->can_read(1);
     foreach my $pendingSock (@pendingSockets) {
       if($pendingSock == $ircSock) {
-        $self->receiveCommand();
+        $self->receiveCommand(1);
       }else{
         $self->{timestamps}->{lobbyPong}=time;
         $self->{lobby}->receiveCommand();
@@ -266,6 +266,7 @@ sub sendDebugChan {
 }
 
 sub receiveCommand {
+  my $socketMode=$_[1];
   my $sl=$self->{simpleLog};
   if(! ((defined $self->{ircSock}) && $self->{ircSock} && $self->{ircSock}->connected)) {
     $sl->log("Unable to receive command from IRC client, not connected!".logSuffix(),1);
@@ -274,7 +275,7 @@ sub receiveCommand {
   }
   my $ircSock=$self->{ircSock};
   my @commands;
-  if($^O eq 'MSWin32') {
+  if($^O eq 'MSWin32' || $socketMode) {
     my $select=IO::Select->new($ircSock);
     while($select->can_read(0)) {
       my $line=$ircSock->getline();
@@ -1033,6 +1034,7 @@ sub applyChannelJoin {
 sub cbChannelTopic {
   my (undef,$chan,$user,$time,$topic)=@_;
   if(defined $self->{pendingChan} && $chan eq $self->{pendingChan}) {
+    $time=$1 if($time =~ /^(\d{10,})\d{3}$/);
     $self->send(":$self->{login}!~$self->{ident}\@$self->{host} JOIN \#$chan");
     $self->send(":$springHost 332 $self->{login} \#$chan :$topic");
     $self->send(":$springHost 333 $self->{login} \#$chan $user $time");
